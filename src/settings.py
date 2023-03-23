@@ -38,8 +38,10 @@ settings = {
     'latency': 0,
     'timeout': 6000,
 
+    'connection_retries':10,
+
     # Other timers
-    'graph_interval': 1000,  # Milliseconds
+    'graph_interval': 10,  # Milliseconds
     'analysis_interval': 1000,  # Milliseconds
 }
 

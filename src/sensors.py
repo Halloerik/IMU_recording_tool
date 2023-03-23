@@ -11,6 +11,8 @@ import traceback
 
 from mbientlab.metawear import MetaWear, libmetawear, parse_value
 from mbientlab.metawear.cbindings import *
+import mbientlab.warble
+
 from time import sleep
 from threading import Event
 import datetime
@@ -21,7 +23,6 @@ from settings import settings, state, \
     t_energy,la_energy,ra_energy,ll_energy,rl_energy
 import os
 import numpy as np
-
 
 class SensorState:
     """Handles the connection to the sensor"""
@@ -149,7 +150,7 @@ class SensorState:
 
     def setup(self):
         """sets up the datasignals and sensor parameters"""
-        print("Configuring device")
+        print("  configuring device")
         libmetawear.mbl_mw_settings_set_connection_parameters(self.device.board,
                                                               settings['min_conn_interval'],
                                                               settings['max_conn_interval'], settings['latency'],
@@ -193,7 +194,7 @@ class SensorState:
         e.wait()
         libmetawear.mbl_mw_datasignal_subscribe(self.processor, None, self.callback)
         self.set_light_pattern('setup')
-        print('done')
+        print('  done')
 
     def start_recording(self):
         """starts the recording"""
@@ -245,22 +246,24 @@ class SensorState:
         self.set_light_pattern(None)
         sleep(2)
 
-        # Reset everything and free memory
-        libmetawear.mbl_mw_debug_reset(self.device.board)
-        libmetawear.mbl_mw_metawearboard_tear_down(self.device.board)
-        libmetawear.mbl_mw_metawearboard_free(self.device.board)
-        sleep(2)
+        # Reset everything
+        libmetawear.mbl_mw_logging_stop(self.device.board)
+        libmetawear.mbl_mw_logging_clear_entries(self.device.board)
+        libmetawear.mbl_mw_macro_erase_all(self.device.board)
+        libmetawear.mbl_mw_debug_reset_after_gc(self.device.board)
         libmetawear.mbl_mw_debug_disconnect(self.device.board)
         sleep(2)
-        print(f"sensor {self.name} disconnected")
-        print(f"address: {self.device.address}, samples:{self.samples}")
         self.device.disconnect()
+        print(f"sensor {self.name} disconnected", "\n",
+              f"  address: {self.device.address}", "\n",
+              f"  samples:{self.samples}")
         sleep(5)
 
 
 class SensorThread(QtCore.QThread):
     """Handles the Sensor state"""
 
+    connected = QtCore.pyqtSignal(str)
     disconnected = QtCore.pyqtSignal(str)
 
     def __init__(self, name):
@@ -279,19 +282,36 @@ class SensorThread(QtCore.QThread):
         self.disconnect = False
         self.recording = False
 
-        # Connection to the needed sensor
-        print("connecting to {}".format(self.adress))
-        self.device = MetaWear(self.adress)
-        self.device.connect()
-        print("connected")
-
-        # Sets a blinking orange light pattern for the sensor
-        self.state = SensorState(self.device, name)
-        self.state.set_light_pattern('connected')
-        # self.subscribed = False
+        self.state = None
 
     def run(self):
         """main loop of the thread."""
+
+        # Connection to the needed sensor
+        print("connecting to {}".format(self.adress))
+        for i in range(settings['connection_retries']):
+            try:
+                print(f"\r  attempt {i + 1}/{settings['connection_retries']}", end="")
+                self.device = MetaWear(self.adress)
+                self.device.connect()
+            except mbientlab.warble.WarbleException as e:
+                if i + 1 == settings['connection_retries']:
+                    traceback.print_exc()
+                    self.disconnect = True
+                    #self.state.disconnect(error_dc=True)
+                    self.disconnected.emit(self.name)
+                    self.quit()
+                    return
+                sleep(1)
+            else:
+                self.connected.emit(self.name)
+                print(" connected")
+                break
+
+        # Sets a blinking orange light pattern for the sensor
+        self.state = SensorState(self.device, self.name)
+        self.state.set_light_pattern('connected')
+
         # sets up the sensor and its signals/data handling
         try:
             self.state.setup()
@@ -299,6 +319,7 @@ class SensorThread(QtCore.QThread):
             traceback.print_exc()
             self.disconnect = True
             self.state.disconnect(error_dc=True)
+            self.disconnected.emit(self.name)
             self.quit()
             return
 
@@ -317,7 +338,8 @@ class SensorThread(QtCore.QThread):
             if self.recording and not state['recording']:
                 self.state.stop_recording()
                 self.recording = False
-        self.device.disconnect()
+            sleep(0.001)
+        # self.device.disconnect() this already happens in the self.state.disconnect() method
         sleep(2)
         self.disconnected.emit(self.name)
         self.quit()
@@ -327,7 +349,7 @@ class SensorThread(QtCore.QThread):
 
     def check_battery(self):
         """Checks battery and returns the value."""
-        if not self.disconnect:
+        if not self.disconnect and self.state:
             self.state.check_battery()
             return self.state.charge
         return "---"
