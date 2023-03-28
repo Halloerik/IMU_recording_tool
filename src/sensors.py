@@ -20,9 +20,10 @@ import csv
 from PyQt5 import QtCore
 from settings import settings, state, \
     t_data, la_data, ra_data, ll_data, rl_data, \
-    t_energy,la_energy,ra_energy,ll_energy,rl_energy
+    t_energy, la_energy, ra_energy, ll_energy, rl_energy
 import os
 import numpy as np
+
 
 class SensorState:
     """Handles the connection to the sensor"""
@@ -32,7 +33,7 @@ class SensorState:
 
         Parameters
         device
-            the object returned by MetaWear(adress)
+            the object returned by MetaWear(address)
         name : str
             the name of this sensor
         """
@@ -83,8 +84,6 @@ class SensorState:
             rl_energy[-1] = np.linalg.norm(arr)
         else:
             raise ValueError
-
-
 
     def create_file(self):
         """Creates a new csv file to save all sensor data"""
@@ -265,6 +264,8 @@ class SensorThread(QtCore.QThread):
 
     connected = QtCore.pyqtSignal(str)
     disconnected = QtCore.pyqtSignal(str)
+    connection_attempt = QtCore.pyqtSignal(int)
+    connection_failed = QtCore.pyqtSignal()
 
     def __init__(self, name):
         """Initializes a Connection to the Sensor
@@ -277,8 +278,8 @@ class SensorThread(QtCore.QThread):
         super(SensorThread, self).__init__()
         self.name = name
 
-        # Mac adress of the the needed sensor
-        self.adress = settings[name + '_adress']
+        # Mac address of the the needed sensor
+        self.address = settings[name + '_address']
         self.disconnect = False
         self.recording = False
 
@@ -288,18 +289,20 @@ class SensorThread(QtCore.QThread):
         """main loop of the thread."""
 
         # Connection to the needed sensor
-        print("connecting to {}".format(self.adress))
+        print("connecting to {}".format(self.address))
         for i in range(settings['connection_retries']):
             try:
                 print(f"\r  attempt {i + 1}/{settings['connection_retries']}", end="")
-                self.device = MetaWear(self.adress)
+                self.connection_attempt.emit(i)
+                self.device = MetaWear(self.address)
                 self.device.connect()
             except mbientlab.warble.WarbleException as e:
                 if i + 1 == settings['connection_retries']:
                     traceback.print_exc()
                     self.disconnect = True
-                    #self.state.disconnect(error_dc=True)
+                    # self.state.disconnect(error_dc=True)
                     self.disconnected.emit(self.name)
+                    self.connection_failed.emit()
                     self.quit()
                     return
                 sleep(1)
@@ -352,4 +355,52 @@ class SensorThread(QtCore.QThread):
         if not self.disconnect and self.state:
             self.state.check_battery()
             return self.state.charge
+        return "---"
+
+
+class SensorResetThread(QtCore.QThread):
+    """Handles the Sensor state"""
+
+    reset_attempt = QtCore.pyqtSignal(int)
+    reset_success = QtCore.pyqtSignal(str)
+    reset_failed = QtCore.pyqtSignal(str)
+
+    def __init__(self, name):
+        """Initializes a Connection to the Sensor
+        Parameters:
+        name : str
+            Name of the sensor to connect to.
+            Possible values are 't','la','ra','ll','rl'
+        """
+
+        super(SensorResetThread, self).__init__()
+        self.name = name
+
+    def run(self):
+        """main loop of the thread."""
+
+        # Connection to the needed sensor
+        for i in range(settings['connection_retries']):
+            try:
+                self.reset_attempt.emit(i)
+                device = MetaWear(settings[self.name + '_address'])
+                device.connect()
+                sleep(2)
+                libmetawear.mbl_mw_logging_stop(device.board)
+                libmetawear.mbl_mw_logging_clear_entries(device.board)
+                libmetawear.mbl_mw_macro_erase_all(device.board)
+                libmetawear.mbl_mw_debug_reset_after_gc(device.board)
+                libmetawear.mbl_mw_debug_disconnect(device.board)
+                sleep(2)
+                device.disconnect()
+                sleep(2)
+                self.reset_success.emit(self.name)
+                self.quit()
+            except mbientlab.warble.WarbleException as e:
+                if i + 1 == settings['connection_retries']:
+                    self.reset_failed.emit(self.name)
+                    traceback.print_exc()
+                    self.quit()
+        self.quit()
+    def check_battery(self):
         return "---"

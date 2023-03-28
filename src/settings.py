@@ -10,11 +10,11 @@ import numpy as np
 from mbientlab.metawear.metawear import GyroBoschOdr, GyroBoschRange, AccBmi160Odr, AccBoschRange
 
 settings = {
-    't_adress': 'CB:84:80:F9:18:41',
-    'la_adress': 'D4:6A:6A:EF:55:23',
-    'ra_adress': 'EE:2D:7D:2E:3A:72',
-    'll_adress': 'C8:73:59:6B:FB:D1',
-    'rl_adress': 'FF:EA:47:38:42:8E',
+    't_address': 'CB:84:80:F9:18:41',
+    'la_address': 'D4:6A:6A:EF:55:23',
+    'ra_address': 'EE:2D:7D:2E:3A:72',
+    'll_address': 'C8:73:59:6B:FB:D1',
+    'rl_address': 'FF:EA:47:38:42:8E',
     'folder': 'recordings',
     'recording_interval': 140*1000,  # 140 seconds
 

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>721</width>
-    <height>595</height>
+    <width>807</width>
+    <height>554</height>
    </rect>
   </property>
   <property name="maximumSize">
@@ -157,87 +157,16 @@
        <string>Connection</string>
       </property>
       <layout class="QGridLayout" name="gridLayout_5">
-       <item row="0" column="1">
-        <widget class="QLabel" name="label">
+       <item row="0" column="5" rowspan="7">
+        <widget class="Line" name="line">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+          <sizepolicy hsizetype="Fixed" vsizetype="Minimum">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
-         <property name="text">
-          <string>Connect</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="4">
-        <widget class="QPushButton" name="record_button">
-         <property name="text">
-          <string>Start Recording</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="2">
-        <widget class="QLabel" name="label_8">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>Battery</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="0">
-        <widget class="QLabel" name="label_2">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>Sensor</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="label_4">
-         <property name="text">
-          <string>Left Arm</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="2">
-        <widget class="QLabel" name="t_charge_label">
-         <property name="text">
-          <string>---%</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1">
-        <widget class="QPushButton" name="t_connection_button">
-         <property name="text">
-          <string>Connect</string>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="0">
-        <widget class="QLabel" name="label_7">
-         <property name="text">
-          <string>Right Leg</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QLabel" name="label_5">
-         <property name="text">
-          <string>Right Arm</string>
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
          </property>
         </widget>
        </item>
@@ -245,6 +174,13 @@
         <widget class="QLabel" name="label_6">
          <property name="text">
           <string>Left Leg</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="label_5">
+         <property name="text">
+          <string>Right Arm</string>
          </property>
         </widget>
        </item>
@@ -264,6 +200,23 @@
        </item>
        <item row="6" column="1">
         <widget class="QPushButton" name="rl_connection_button">
+         <property name="text">
+          <string>Connect</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="2">
+        <widget class="QLabel" name="ll_charge_label">
+         <property name="text">
+          <string>---%</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QPushButton" name="ra_connection_button">
          <property name="text">
           <string>Connect</string>
          </property>
@@ -296,20 +249,10 @@
          </property>
         </widget>
        </item>
-       <item row="3" column="1">
-        <widget class="QPushButton" name="ra_connection_button">
+       <item row="5" column="6">
+        <widget class="QLabel" name="label_9">
          <property name="text">
-          <string>Connect</string>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="2">
-        <widget class="QLabel" name="ll_charge_label">
-         <property name="text">
-          <string>---%</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+          <string>Person:</string>
          </property>
         </widget>
        </item>
@@ -323,21 +266,7 @@
          </property>
         </widget>
        </item>
-       <item row="3" column="4">
-        <widget class="QPushButton" name="quit_button">
-         <property name="text">
-          <string>Quit</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="4">
-        <widget class="QPushButton" name="reset_button">
-         <property name="text">
-          <string>Full Reset</string>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="4">
+       <item row="6" column="6">
         <widget class="QLineEdit" name="person_lineEdit">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -350,27 +279,98 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="4">
-        <widget class="QLabel" name="label_9">
+       <item row="1" column="6">
+        <widget class="QPushButton" name="record_button">
          <property name="text">
-          <string>Person:</string>
+          <string>Start Recording</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="6">
+        <widget class="QPushButton" name="quit_button">
+         <property name="text">
+          <string>Quit</string>
          </property>
         </widget>
        </item>
        <item row="0" column="3" rowspan="7">
-        <widget class="Line" name="line">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Fixed" vsizetype="Minimum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
+        <widget class="Line" name="line_2">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
          </property>
         </widget>
        </item>
-       <item row="2" column="5">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Sensor</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLabel" name="label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Connect</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_4">
+         <property name="text">
+          <string>Left Arm</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QLabel" name="label_8">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Battery</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QPushButton" name="t_connection_button">
+         <property name="text">
+          <string>Connect</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="label_7">
+         <property name="text">
+          <string>Right Leg</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QLabel" name="t_charge_label">
+         <property name="text">
+          <string>---%</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="7">
         <spacer name="horizontalSpacer">
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
@@ -385,6 +385,61 @@
           </size>
          </property>
         </spacer>
+       </item>
+       <item row="1" column="4">
+        <widget class="QLabel" name="t_status_label">
+         <property name="text">
+          <string>Disconnected</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="4">
+        <widget class="QLabel" name="ra_status_label">
+         <property name="text">
+          <string>Disconnected</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="4">
+        <widget class="QLabel" name="la_status_label">
+         <property name="text">
+          <string>Disconnected</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="4">
+        <widget class="QLabel" name="ll_status_label">
+         <property name="text">
+          <string>Disconnected</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="4">
+        <widget class="QLabel" name="label_10">
+         <property name="minimumSize">
+          <size>
+           <width>95</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>Status</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="4">
+        <widget class="QLabel" name="rl_status_label">
+         <property name="text">
+          <string>Disconnected</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="6">
+        <widget class="QPushButton" name="reset_button">
+         <property name="text">
+          <string>Full Reset</string>
+         </property>
+        </widget>
        </item>
       </layout>
      </widget>

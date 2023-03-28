@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import QMessageBox
 import pyqtgraph as pg
 from settings import settings, state, \
     t_energy, la_energy, ra_energy, ll_energy, rl_energy
-from sensors import SensorThread
+from sensors import SensorThread, SensorResetThread
 import network
 from PyQt5.QtCore import QTimer, QThread, pyqtSlot, pyqtSignal
 from mbientlab.metawear import MetaWear, libmetawear
@@ -24,7 +24,6 @@ from mbientlab.metawear.cbindings import *
 import mbientlab.warble
 
 pg.setConfigOption('background', 'w')
-pg.setConfigOption('foreground', 'k')
 
 
 class GUI(QtWidgets.QMainWindow):
@@ -102,6 +101,8 @@ class GUI(QtWidgets.QMainWindow):
         # settings_button.clicked.connect(lambda _: _)#TODO:
         self.reset_button = self.findChild(QtWidgets.QPushButton, 'reset_button')
         self.reset_button.clicked.connect(lambda _: self.full_reset())
+        self.quit_button = self.findChild(QtWidgets.QPushButton, 'quit_button')
+        self.quit_button.clicked.connect(lambda _: self.close())
 
         # ----------Line Edits----------------------
         self.person_lineEdit = self.findChild(QtWidgets.QLineEdit, 'person_lineEdit')
@@ -177,30 +178,45 @@ class GUI(QtWidgets.QMainWindow):
             self.t_sensor_thread = SensorThread(name)
             self.t_sensor_thread.connected.connect(self.connected_sensor)
             self.t_sensor_thread.disconnected.connect(self.disconnected_sensor)
+            self.t_sensor_thread.connection_attempt.connect(lambda i: self.t_status_label.setText(
+                f"Connecting {i + 1}/{settings['connection_retries']}"))
+            self.t_sensor_thread.connection_failed.connect(lambda: self.t_status_label.setText("Connection failed"))
             self.t_sensor_thread.start()
             button = self.t_connection_button
         elif name == 'la':
             self.la_sensor_thread = SensorThread(name)
             self.la_sensor_thread.connected.connect(self.connected_sensor)
             self.la_sensor_thread.disconnected.connect(self.disconnected_sensor)
+            self.la_sensor_thread.connection_attempt.connect(lambda i: self.la_status_label.setText(
+                f"Connecting {i + 1}/{settings['connection_retries']}"))
+            self.la_sensor_thread.connection_failed.connect(lambda: self.la_status_label.setText("Connection failed"))
             self.la_sensor_thread.start()
             button = self.la_connection_button
         elif name == 'ra':
             self.ra_sensor_thread = SensorThread(name)
             self.ra_sensor_thread.connected.connect(self.connected_sensor)
             self.ra_sensor_thread.disconnected.connect(self.disconnected_sensor)
+            self.ra_sensor_thread.connection_attempt.connect(lambda i: self.ra_status_label.setText(
+                f"Connecting {i + 1}/{settings['connection_retries']}"))
+            self.ra_sensor_thread.connection_failed.connect(lambda: self.ra_status_label.setText("Connection failed"))
             self.ra_sensor_thread.start()
             button = self.ra_connection_button
         elif name == 'll':
             self.ll_sensor_thread = SensorThread(name)
             self.ll_sensor_thread.connected.connect(self.connected_sensor)
             self.ll_sensor_thread.disconnected.connect(self.disconnected_sensor)
+            self.ll_sensor_thread.connection_attempt.connect(lambda i: self.ll_status_label.setText(
+                f"Connecting {i + 1}/{settings['connection_retries']}"))
+            self.ll_sensor_thread.connection_failed.connect(lambda: self.ll_status_label.setText("Connection failed"))
             self.ll_sensor_thread.start()
             button = self.ll_connection_button
         elif name == 'rl':
             self.rl_sensor_thread = SensorThread(name)
             self.rl_sensor_thread.connected.connect(self.connected_sensor)
             self.rl_sensor_thread.disconnected.connect(self.disconnected_sensor)
+            self.rl_sensor_thread.connection_attempt.connect(lambda i: self.rl_status_label.setText(
+                f"Connecting {i + 1}/{settings['connection_retries']}"))
+            self.rl_sensor_thread.connection_failed.connect(lambda: self.rl_status_label.setText("Connection failed"))
             self.rl_sensor_thread.start()
             button = self.rl_connection_button
         else:
@@ -220,14 +236,19 @@ class GUI(QtWidgets.QMainWindow):
 
         if name == 't':
             button = self.t_connection_button
+            status_label = self.t_status_label
         elif name == 'la':
             button = self.la_connection_button
+            status_label = self.la_status_label
         elif name == 'ra':
             button = self.ra_connection_button
+            status_label = self.ra_status_label
         elif name == 'll':
             button = self.ll_connection_button
+            status_label = self.ll_status_label
         elif name == 'rl':
             button = self.rl_connection_button
+            status_label = self.rl_status_label
         else:
             raise ValueError
 
@@ -236,6 +257,8 @@ class GUI(QtWidgets.QMainWindow):
         button.clicked.disconnect()
         button.clicked.connect(lambda _: self.disconnect_sensor(name))
         button.setEnabled(True)
+
+        status_label.setText("Connected")
 
         # for button in [self.t_connection_button,
         #               self.la_connection_button,self.ra_connection_button,
@@ -267,7 +290,7 @@ class GUI(QtWidgets.QMainWindow):
             self.rl_sensor_thread.disconnect_sensor()
             button = self.rl_connection_button
         else:
-            raise Exception
+            raise ValueError
 
         # Disables the button until thread is finished
         button.setEnabled(False)
@@ -285,31 +308,39 @@ class GUI(QtWidgets.QMainWindow):
         if name == 't':
             self.t_sensor_thread = None
             button = self.t_connection_button
-            self.t_charge_label.setText('---%')
+            charge_label = self.t_charge_label
+            status_label = self.t_status_label
         elif name == 'la':
             self.la_sensor_thread = None
             button = self.la_connection_button
-            self.la_charge_label.setText('---%')
+            charge_label = self.la_charge_label
+            status_label = self.la_status_label
         elif name == 'ra':
             self.ra_sensor_thread = None
             button = self.ra_connection_button
-            self.ra_charge_label.setText('---%')
+            charge_label = self.ra_charge_label
+            status_label = self.ra_status_label
         elif name == 'll':
             self.ll_sensor_thread = None
             button = self.ll_connection_button
-            self.ll_charge_label.setText('---%')
+            charge_label = self.ll_charge_label
+            status_label = self.ll_status_label
         elif name == 'rl':
             self.rl_sensor_thread = None
             button = self.rl_connection_button
-            self.rl_charge_label.setText('---%')
+            charge_label = self.rl_charge_label
+            status_label = self.rl_status_label
         else:
-            raise Exception
+            raise ValueError
 
         # Changes the disconnect Button back to a connect Button
         button.setText("Connect")
         button.clicked.disconnect()
         button.clicked.connect(lambda _: self.connect_sensor(name))
         button.setEnabled(True)
+
+        charge_label.setText("---%")
+        status_label.setText("Disconnected")
 
     def update_battery(self):
         """Checks the Batterycharge percentage of the Sensors and updates the GUI"""
@@ -358,8 +389,9 @@ class GUI(QtWidgets.QMainWindow):
                    self.rl_sensor_thread]
 
         # Checks if all Sensors are connected before a recording starts
-        if reduce(lambda x, y: x and y,
-                  map(lambda x: True if x is not None else False, threads)):  # all threads present
+        #if reduce(lambda x, y: x and y,
+        #          map(lambda x: True if x is not None else False, threads)):  # all threads present
+        if all(map(lambda x:x is not None, threads)):
             # if reduce(lambda x,y: x or y, map(lambda x: True if x is not None else False, threads)): #at least one thread present
             # Determine path for storing sensor data
             person = self.person_lineEdit.text()
@@ -379,6 +411,13 @@ class GUI(QtWidgets.QMainWindow):
             self.reset_button.setEnabled(False)
 
             self.nn_button.setEnabled(False)
+
+            # Update status labels
+            self.t_status_label.setText("Recording")
+            self.la_status_label.setText("Recording")
+            self.ra_status_label.setText("Recording")
+            self.ll_status_label.setText("Recording")
+            self.rl_status_label.setText("Recording")
 
             # Turn start-recording-button into stop-recording-button
             self.record_button.setText("Stop recording")
@@ -414,6 +453,13 @@ class GUI(QtWidgets.QMainWindow):
 
         self.nn_button.setEnabled(True)
 
+        # Update status labels #TODO make this show the number of recorded samples?
+        self.t_status_label.setText("Ready")
+        self.la_status_label.setText("Ready")
+        self.ra_status_label.setText("Ready")
+        self.ll_status_label.setText("Ready")
+        self.rl_status_label.setText("Ready")
+
         # Turn stop-recording-button back into start-recording-button
         self.record_button.setText("Start recording")
         self.record_button.clicked.disconnect()
@@ -428,55 +474,70 @@ class GUI(QtWidgets.QMainWindow):
         """Disconnects and resets sensors in case of an error"""
 
         sensors = ['t', 'la', 'ra', 'll', 'rl']
+        threads = [self.t_sensor_thread, self.la_sensor_thread, self.ra_sensor_thread,
+                   self.ll_sensor_thread, self.rl_sensor_thread]
+        buttons = [self.t_connection_button, self.la_connection_button, self.ra_connection_button,
+                   self.ll_connection_button, self.rl_connection_button, self.reset_button, self.record_button]
 
         # Disconnects all sensors
         print("disconnecting from sensors")
         state['recording'] = False
         state['end'] = True
-        if self.t_sensor_thread is not None:
-            self.t_sensor_thread.wait()
-        if self.la_sensor_thread is not None:
-            self.la_sensor_thread.wait()
-        if self.ra_sensor_thread is not None:
-            self.ra_sensor_thread.wait()
-        if self.ll_sensor_thread is not None:
-            self.ll_sensor_thread.wait()
-        if self.rl_sensor_thread is not None:
-            self.rl_sensor_thread.wait()
+        for thread in threads:
+            if thread is not None:
+                thread.wait()
         state['end'] = False
 
-        # Resets all sensors
-        for sensor in sensors:
-            print(f"resetting {sensor}")
-            try:
-                self.reset_sensor(sensor)
-            except mbientlab.warble.WarbleException as e:
-                print(f"\nCouldnt find {sensor}-Sensor. Maybe it is not Charged? Or Bluetooth is not Enabled?")
-                traceback.print_exc()
-                sleep(1)
+        for button in buttons:
+            button.setEnabled(False)
 
-    def reset_sensor(self, name):
-        """Reset a certain sensor"""
-        for i in range(settings['connection_retries']):
-            try:
-                print(f"\r  attempt {i + 1}/{settings['connection_retries']}", end="")
-                device = MetaWear(settings[name + '_adress'])
-                device.connect()
-                sleep(2)
-                libmetawear.mbl_mw_logging_stop(device.board)
-                libmetawear.mbl_mw_logging_clear_entries(device.board)
-                libmetawear.mbl_mw_macro_erase_all(device.board)
-                libmetawear.mbl_mw_debug_reset_after_gc(device.board)
-                libmetawear.mbl_mw_debug_disconnect(device.board)
-                sleep(2)
-                device.disconnect()
-                sleep(2)
-            except mbientlab.warble.WarbleException as e:
-                if i + 1 == settings['connection_retries']:
-                    raise e
-            else:
-                print(" done")
-                break
+        # Resets all sensors
+        print("resetting sensors")
+
+        self.t_sensor_thread = SensorResetThread('t')
+        self.la_sensor_thread = SensorResetThread('la')
+        self.ra_sensor_thread = SensorResetThread('ra')
+        self.ll_sensor_thread = SensorResetThread('ll')
+        self.rl_sensor_thread = SensorResetThread('rl')
+
+        threads = [self.t_sensor_thread, self.la_sensor_thread, self.ra_sensor_thread,
+                   self.ll_sensor_thread, self.rl_sensor_thread]
+
+        status_labels = [self.t_status_label, self.la_status_label, self.ra_status_label,
+                         self.ll_status_label, self.rl_status_label]
+
+        for thread, label in zip(threads, status_labels):
+            thread.reset_attempt.connect(lambda i,l=label: l.setText(
+                f"\rResetting {i + 1}/{settings['connection_retries']}"))
+            thread.reset_success.connect(lambda _, l=label: l.setText("Reset successful"))
+            thread.reset_success.connect(self.reset_finished)
+            thread.reset_failed.connect(lambda _, l=label: l.setText("Reset failed"))
+            thread.reset_failed.connect(self.reset_finished)
+            thread.start()
+
+    def reset_finished(self, name):
+        buttons = [self.t_connection_button, self.la_connection_button, self.ra_connection_button,
+                   self.ll_connection_button, self.rl_connection_button, self.reset_button, self.record_button]
+
+        if name == 't':
+            self.t_sensor_thread = None
+        elif name == 'la':
+            self.la_sensor_thread = None
+        elif name == 'ra':
+            self.ra_sensor_thread = None
+        elif name == 'll':
+            self.ll_sensor_thread = None
+        elif name == 'rl':
+            self.rl_sensor_thread = None
+        else:
+            raise ValueError
+
+        threads = [self.t_sensor_thread, self.la_sensor_thread, self.ra_sensor_thread,
+                   self.ll_sensor_thread, self.rl_sensor_thread]
+
+        if all(map(lambda x: x is None, threads)):
+            for button in buttons:
+                button.setEnabled(True)
 
 
 class RecordingGraphThread(QThread):
@@ -518,6 +579,9 @@ class RecordingGraphThread(QThread):
     def timerEvent(self, _):  # Timer gets discarded. There is only 1 active timer anyway.
         # self.on_timeout.emit()
         self.update_graphs()
+
+
+pg.setConfigOption('foreground', 'k')
 
 
 class AnalysysThread(QThread):
