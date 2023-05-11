@@ -1,7 +1,8 @@
 '''
 Created on May 17, 2019
 
-@author: fmoya
+@author: Fernando Moya Rueda, Erik Altermann, Arthur Matei
+@email: erik.altermann@tu-dortmund.de, 	fernando.moya@tu-dortmund.de, arthur.matei@tu-dortmund.de
 '''
 
 from __future__ import print_function
@@ -1153,7 +1154,7 @@ class Network(nn.Module):
         # f, axarr = plt.subplots(5, 1)
 
         # x_plt = x[0, 0].to("cpu", torch.double).detach()
-        # axarr[0].plot(x_plt[0], label='input')
+        # axarr[0].plot(x_plt[0], current_class_label='input')
 
         # fft = torch.rfft(x, signal_ndim=1, normalized=True, onesided=True)
         fft = torch.fft.rfft(x, norm="forward")
@@ -1163,7 +1164,7 @@ class Network(nn.Module):
 
         # fft_plt = fft[0, 0].to("cpu", torch.double).detach()
         # fft_plt = torch.norm(fft_plt, dim=2)
-        # axarr[1].plot(fft_plt[0], 'o', label='fft')
+        # axarr[1].plot(fft_plt[0], 'o', current_class_label='fft')
 
         # x = fft[:, :, :, :int(fft.shape[3] / 2)]
         x = fft[:, :, :, :int(math.ceil(fft.shape[3] / 2))]
@@ -1172,7 +1173,7 @@ class Network(nn.Module):
 
         # fftx_plt = x[0, 0].to("cpu", torch.double).detach()
         # fftx_plt = torch.norm(fftx_plt, dim=2)
-        # axarr[2].plot(fftx_plt[0], 'o', label='fft')
+        # axarr[2].plot(fftx_plt[0], 'o', current_class_label='fft')
 
         # x = torch.irfft(x, signal_ndim=1, normalized=True, onesided=True)
         x = torch.fft.irfft(x, norm="forward")
@@ -1184,18 +1185,18 @@ class Network(nn.Module):
             self.save_acts(x, "x_LA_ifft_pool")
 
         # x_plt = x[0, 0].to("cpu", torch.double).detach()
-        # axarr[3].plot(x_plt[0], label='input')
+        # axarr[3].plot(x_plt[0], current_class_label='input')
 
         x = x.permute(0, 1, 3, 2)
 
         # fft2_plt = fft2[0, 0].to("cpu", torch.double).detach()
         # fft2_plt = torch.norm(fft2_plt, dim=2)
         # print(fft2_plt.size(), 'max: {}'.format(torch.max(fft2_plt)), 'min: {}'.format(torch.min(fft2_plt)))
-        # axarr[4].plot(fft2_plt[0], 'o', label='fft')
+        # axarr[4].plot(fft2_plt[0], 'o', current_class_label='fft')
 
         # xpool = xpool.permute(0, 1, 3, 2)
         # x_plt = xpool[0, 0].to("cpu", torch.double).detach()
-        # axarr[3].plot(x_plt[0], label='input')
+        # axarr[3].plot(x_plt[0], current_class_label='input')
 
         # plt.waitforbuttonpress(0)
         # plt.close()
@@ -1221,8 +1222,52 @@ def load_network(path) -> Network:
     # net = Network(state_dict["network_config"]) # incomplete config. gives keyerrors
     net = Network(config)
     net.load_state_dict(state_dict["state_dict"])
-    #print(net)
+    net.eval()
+
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda" if use_cuda else "cpu")
+    net.to(device=device, dtype=torch.float)
+    # print(net)
     return net
+
+
+mean_values = np.array([-0.59011078, 0.21370987, 0.35121016, 0.92213551, 0.16381447,
+                        -1.4104172, 0.0227385, 1.01524423, -0.1326606, 1.50302222,
+                        1.6741917, -1.36223996, -0.96851859, -0.07210883, 0.13965264,
+                        -0.00339991, 1.10663298, 0.48543698, -0.60798819, -0.23433834,
+                        0.41563179, -1.09679218, 0.70833077, 0.37622293, -0.2071909,
+                        -0.87027332, -0.20594663, -0.13839382, 0.1675007, 0.70815734])
+mean_values = np.reshape(mean_values, [1, 30])
+
+std_values = np.array([1.02790431, 0.54293909, 0.60919268, 56.30538052, 72.91016666,
+                       78.53805221, 0.89515912, 0.54585097, 0.62408347, 75.26524784,
+                       91.73655101, 60.16483688, 0.33170985, 0.21570707, 0.29992192,
+                       42.02785466, 23.25204603, 18.41281644, 0.43064442, 0.51308243,
+                       0.45229039, 72.98513239, 73.16297869, 72.16814269, 0.79006157,
+                       0.45560435, 0.5095047, 35.01586674, 58.97545938, 61.68184099])
+std_values = np.reshape(std_values, [1, 30])
+
+use_cuda = torch.cuda.is_available()
+device = torch.device("cuda" if use_cuda else "cpu")
+
+window_size = 200
+
+mean_values = torch.from_numpy(np.repeat(mean_values, window_size, axis=0).T[None, None, :, :]).to(device=device,
+                                                                                           dtype=torch.float)
+std_values = torch.from_numpy(np.repeat(std_values, window_size, axis=0).T[None, None, :, :]).to(device=device,
+                                                                                         dtype=torch.float)
+
+max_values = mean_values + 2 * std_values
+min_values = mean_values - 2 * std_values
+
+
+def norm_mbientlab(data):
+    data_norm = (data - min_values) / (max_values - min_values)
+
+    data_norm[data_norm > 1] = 1
+    data_norm[data_norm < 0] = 0
+
+    return data_norm
 
 
 if __name__ == "__main__":

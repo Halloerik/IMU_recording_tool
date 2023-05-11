@@ -1,0 +1,1 @@
+Standing,Walking,Cart,Handling(UP),Handling(CENTER),Handling(DOWN),Synchronization,None

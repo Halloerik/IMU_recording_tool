@@ -1,7 +1,8 @@
 '''
 Created on 11.06.2020
 
-@author: Erik
+@author: Erik Altermann, Fernando Moya Rueda, Arthur Matei
+@email: erik.altermann@tu-dortmund.de, 	fernando.moya@tu-dortmund.de, arthur.matei@tu-dortmund.de
 '''
 import math
 
@@ -22,10 +23,6 @@ settings = {
     # https://mbientlab.com/documents/metawear/cpp/latest/accelerometer_8h.html
     # https://mbientlab.com/documents/metawear/cpp/latest/gyro__bmi160_8h.html
     # https://mbientlab.com/documents/metawear/cpp/latest/gyro__bosch_8h.html
-    # 'acc_odr': 200.0,
-    # 'acc_range': 8.0,
-    # 'gyro_odr': 8.0,  # because of the MblMwGyroBmi169Odr
-    # 'gyro_range': 1.0,
     'acc_odr': AccBmi160Odr._100Hz,
     'acc_range': AccBoschRange._8G,
     'gyro_odr': GyroBoschOdr._100Hz,
@@ -38,13 +35,14 @@ settings = {
     'latency': 0,
     'timeout': 6000,
 
-    'connection_retries':10,
+    'connection_retries':10,  # How often the program will try to connect to the sensors before giving up.
 
     # Other timers
     'graph_interval': 10,  # Milliseconds
     'analysis_interval': 1000,  # Milliseconds
 }
 
+# Controls for the sensor threads.
 state = {'recording': False,
          'end': False,
          'final_folder': '',
@@ -58,12 +56,14 @@ state = {'recording': False,
 # if not os.path.exists(settings["folder"]):
 #    os.makedirs(settings["folder"])
 
+# Raw data from each sensor.
 t_data =  np.zeros((200, 6))
 la_data = np.zeros((200, 6))
 ra_data = np.zeros((200, 6))
 ll_data = np.zeros((200, 6))
 rl_data = np.zeros((200, 6))
 
+# L2 Norm of each sensors raw data.
 t_energy =  np.zeros((200,))
 la_energy = np.zeros((200,))
 ra_energy = np.zeros((200,))

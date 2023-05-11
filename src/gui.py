@@ -1,9 +1,10 @@
-'''
+"""
 Created on 18.2.2020
 
-@author: Erik Altermann
-@email: Erik.Altermann@tu-dortmund.de
-'''
+@author: Erik Altermann, Fernando Moya Rueda, Arthur Matei
+@email: erik.altermann@tu-dortmund.de, 	fernando.moya@tu-dortmund.de, arthur.matei@tu-dortmund.de
+"""
+
 import traceback
 from builtins import map
 from _functools import reduce
@@ -13,17 +14,30 @@ import os
 
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtWidgets import QMessageBox
-import pyqtgraph as pg
-from settings import settings, state, \
-    t_energy, la_energy, ra_energy, ll_energy, rl_energy
-from sensors import SensorThread, SensorResetThread
-import network
 from PyQt5.QtCore import QTimer, QThread, pyqtSlot, pyqtSignal
-from mbientlab.metawear import MetaWear, libmetawear
+import pyqtgraph as pg
+
+import numpy as np
+import torch
+from sklearn.metrics.pairwise import cosine_similarity
+
 from mbientlab.metawear.cbindings import *
+from mbientlab.metawear import MetaWear, libmetawear
 import mbientlab.warble
 
+import network
+from settings import settings, state, \
+    t_energy, la_energy, ra_energy, ll_energy, rl_energy, \
+    t_data, la_data, ra_data, ll_data, rl_data
+
+use_fake_sensors = False  # Useful for debugging without connecting sensors
+if use_fake_sensors:
+    from fake_sensors import SensorThread, SensorResetThread
+else:
+    from sensors import SensorThread, SensorResetThread
+
 pg.setConfigOption('background', 'w')
+pg.setConfigOption('foreground', 'k')
 
 
 class GUI(QtWidgets.QMainWindow):
@@ -55,11 +69,14 @@ class GUI(QtWidgets.QMainWindow):
         self.recording_timer.setSingleShot(True)
         self.show()
 
+        # This Timer will show the recorded data of each sensor in real time as they are recording
         self.graph_timer = RecordingGraphThread(t_plot=self.t_plot,
                                                 la_plot=self.la_plot, ra_plot=self.ra_plot,
                                                 ll_plot=self.ll_plot, rl_plot=self.rl_plot)
-        self.analysis_timer = AnalysysThread()
-        self.net = None
+
+        # This timer will use a neural network to analyse the recorded data live.
+        # It is initialized in the self.load_network() method
+        self.analysis_timer = None
 
     def init_gui_elements(self):
         """Connects GUI-Elements to their functions"""
@@ -109,7 +126,7 @@ class GUI(QtWidgets.QMainWindow):
         # self.person_lineEdit
 
         # -----------------------------------------------------
-        # ----------Recording----------------------------------
+        # ----------Recording graphs---------------------------
         # -----------------------------------------------------
         t_graph = self.findChild(pg.PlotWidget, "graphicsView_t")
         t_graph.setYRange(0, 500)
@@ -132,7 +149,7 @@ class GUI(QtWidgets.QMainWindow):
         self.rl_plot = rl_graph.plot(rl_energy)
 
         # -----------------------------------------------------
-        # ----------Analysis-----------------------------------
+        # ----------Analysis graphs----------------------------
         # -----------------------------------------------------
         self.c_graph = self.findChild(pg.PlotWidget, "graphicsView_c")
         self.a_graph = self.findChild(pg.PlotWidget, "graphicsView_a")
@@ -171,7 +188,7 @@ class GUI(QtWidgets.QMainWindow):
         Parameters:
         name : str
             Name of the sensor to connect to.
-            Possible values are 't','la','ra','ll','rl'
+            Possible values are 't', 'la', 'ra', 'll', 'rl'
         """
 
         if name == 't':
@@ -232,7 +249,13 @@ class GUI(QtWidgets.QMainWindow):
 
     @pyqtSlot(str)
     def connected_sensor(self, name):
-        """"""
+        """A slot which is called once a sensor has successfully connected and finished its setup.
+
+        Parameters:
+        name : str
+            Name of the sensor which was connected.
+            Possible values are 't', 'la', 'ra', 'll', 'rl'
+        """
 
         if name == 't':
             button = self.t_connection_button
@@ -297,11 +320,11 @@ class GUI(QtWidgets.QMainWindow):
 
     @pyqtSlot(str)
     def disconnected_sensor(self, name):
-        """Finalizes disconnection
+        """A slot which is called once a sensor finished the disconnection process.
 
         Parameters:
         name : str
-            Name of the sensor to connect to.
+            Name of the disconnected sensor.
             Possible values are 't','la','ra','ll','rl'
         """
 
@@ -366,15 +389,23 @@ class GUI(QtWidgets.QMainWindow):
             self.rl_charge_label.setText('{}%'.format(charge))
 
     def load_network(self):
+        """Loads the neural network used for live analysis and initializes the analysis thread"""
         net = network.load_network("../network.pt")
         self.nn_label.setText("Loaded")
+
+        attribute_rep = np.loadtxt(f"..{os.sep}atts_per_class_dataset.txt", delimiter=",")
 
         self.nn_button.clicked.disconnect()
         self.nn_button.clicked.connect(lambda _: self.unload_network())
         self.nn_button.setText("Unload")
 
+        self.analysis_timer = AnalysisThread(net, attribute_rep, self.a_graph, self.c_graph)
+
     def unload_network(self):
-        self.net = None
+        """Unloads the neural network and stops the analysis thread"""
+        self.analysis_timer.stop_timer()
+        self.analysis_timer = None
+
         self.nn_label.setText("None")
 
         self.nn_button.clicked.disconnect()
@@ -389,10 +420,9 @@ class GUI(QtWidgets.QMainWindow):
                    self.rl_sensor_thread]
 
         # Checks if all Sensors are connected before a recording starts
-        #if reduce(lambda x, y: x and y,
-        #          map(lambda x: True if x is not None else False, threads)):  # all threads present
-        if all(map(lambda x:x is not None, threads)):
-            # if reduce(lambda x,y: x or y, map(lambda x: True if x is not None else False, threads)): #at least one thread present
+        if all(map(lambda x: x is not None, threads)):
+            # if any(map(lambda x: x is not None, threads)):
+
             # Determine path for storing sensor data
             person = self.person_lineEdit.text()
             time = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
@@ -429,7 +459,7 @@ class GUI(QtWidgets.QMainWindow):
             print('recording!')
             self.recording_timer.start(settings['recording_interval'])
             self.graph_timer.start_timer()
-            if self.net:
+            if self.analysis_timer:
                 self.analysis_timer.start_timer()
             sleep(1)
         else:
@@ -441,7 +471,8 @@ class GUI(QtWidgets.QMainWindow):
         # Stops the timer so that this Function doesn't get excecuted twice if the user stops the recording manually
         self.recording_timer.stop()
         self.graph_timer.stop_timer()
-        self.analysis_timer.stop_timer()
+        if self.analysis_timer:
+            self.analysis_timer.stop_timer()
 
         # Enables all connection buttons again
         self.t_connection_button.setEnabled(True)
@@ -473,11 +504,13 @@ class GUI(QtWidgets.QMainWindow):
     def full_reset(self):
         """Disconnects and resets sensors in case of an error"""
 
-        sensors = ['t', 'la', 'ra', 'll', 'rl']
         threads = [self.t_sensor_thread, self.la_sensor_thread, self.ra_sensor_thread,
                    self.ll_sensor_thread, self.rl_sensor_thread]
         buttons = [self.t_connection_button, self.la_connection_button, self.ra_connection_button,
                    self.ll_connection_button, self.rl_connection_button, self.reset_button, self.record_button]
+
+        for button in buttons:
+            button.setEnabled(False)
 
         # Disconnects all sensors
         print("disconnecting from sensors")
@@ -488,8 +521,9 @@ class GUI(QtWidgets.QMainWindow):
                 thread.wait()
         state['end'] = False
 
+        # Buttons would get enabled again by the disconnected_sensor method after the threads quit
         for button in buttons:
-            button.setEnabled(False)
+            button.setEnabled(False)  # TODO race condition with threads ending causes the buttons to be enabled anyway
 
         # Resets all sensors
         print("resetting sensors")
@@ -507,7 +541,7 @@ class GUI(QtWidgets.QMainWindow):
                          self.ll_status_label, self.rl_status_label]
 
         for thread, label in zip(threads, status_labels):
-            thread.reset_attempt.connect(lambda i,l=label: l.setText(
+            thread.reset_attempt.connect(lambda i, l=label: l.setText(
                 f"\rResetting {i + 1}/{settings['connection_retries']}"))
             thread.reset_success.connect(lambda _, l=label: l.setText("Reset successful"))
             thread.reset_success.connect(self.reset_finished)
@@ -515,10 +549,20 @@ class GUI(QtWidgets.QMainWindow):
             thread.reset_failed.connect(self.reset_finished)
             thread.start()
 
+    @pyqtSlot(str)
     def reset_finished(self, name):
+        """A slot which is called once a sensor finished the reset process.
+
+        Parameters:
+        name : str
+            Name of the disconnected sensor.
+            Possible values are 't','la','ra','ll','rl'
+        """
+
         buttons = [self.t_connection_button, self.la_connection_button, self.ra_connection_button,
                    self.ll_connection_button, self.rl_connection_button, self.reset_button, self.record_button]
 
+        # Dereference the sensor_thread that called this method
         if name == 't':
             self.t_sensor_thread = None
         elif name == 'la':
@@ -535,15 +579,20 @@ class GUI(QtWidgets.QMainWindow):
         threads = [self.t_sensor_thread, self.la_sensor_thread, self.ra_sensor_thread,
                    self.ll_sensor_thread, self.rl_sensor_thread]
 
+        # If all threads are finished, enable the buttons
         if all(map(lambda x: x is None, threads)):
             for button in buttons:
                 button.setEnabled(True)
 
 
 class RecordingGraphThread(QThread):
+    """Thread for showing recorded data live"""
+
     # on_timeout = pyqtSignal()
 
-    def __init__(self, t_plot, la_plot, ra_plot, ll_plot, rl_plot):
+    def __init__(self, t_plot: pg.PlotItem, la_plot: pg.PlotItem, ra_plot: pg.PlotItem,
+                 ll_plot: pg.PlotItem, rl_plot: pg.PlotItem):
+        """"""
         super(RecordingGraphThread, self).__init__()
 
         self.t_plot = t_plot
@@ -556,6 +605,19 @@ class RecordingGraphThread(QThread):
         self.interval = settings["graph_interval"]
 
     def update_graphs(self):
+        """"""
+        # print("recording graph update graphs")
+        t_energy[:-1] = t_energy[1:]
+        t_energy[-1] = np.linalg.norm(t_data[-1])
+        la_energy[:-1] = la_energy[1:]
+        la_energy[-1] = np.linalg.norm(la_data[-1])
+        ra_energy[:-1] = ra_energy[1:]
+        ra_energy[-1] = np.linalg.norm(ra_data[-1])
+        ll_energy[:-1] = ll_energy[1:]
+        ll_energy[-1] = np.linalg.norm(ll_data[-1])
+        rl_energy[:-1] = rl_energy[1:]
+        rl_energy[-1] = np.linalg.norm(rl_data[-1])
+
         self.t_plot.setData(t_energy)
         self.la_plot.setData(la_energy)
         self.ra_plot.setData(ra_energy)
@@ -563,6 +625,7 @@ class RecordingGraphThread(QThread):
         self.rl_plot.setData(rl_energy)
 
     def start_timer(self):
+        # print("recording graph starting timer")
         self.timer = self.startTimer(self.interval)
         # print("timer started, id:",self.timer)
 
@@ -579,18 +642,75 @@ class RecordingGraphThread(QThread):
     def timerEvent(self, _):  # Timer gets discarded. There is only 1 active timer anyway.
         # self.on_timeout.emit()
         self.update_graphs()
+        # print("recording graph timer event")
 
 
-pg.setConfigOption('foreground', 'k')
+class AnalysisThread(QThread):
+    """Thread for analysing recorded data live with a neural network"""
 
-
-class AnalysysThread(QThread):
     # on_timeout = pyqtSignal()
 
-    def __init__(self):
+    def __init__(self, network: network.Network, attribute_representation: np.ndarray,
+                 a_graph: pg.PlotItem, c_graph: pg.PlotItem):
+
         super().__init__()
         self.timer = 0
         self.interval = settings["analysis_interval"]
+
+        self.network = network
+        self.attribute_representation = attribute_representation
+
+        use_cuda = torch.cuda.is_available()
+        self.device = torch.device("cuda" if use_cuda else "cpu")
+        self.data = torch.randn((1, 1, 30, 200)).to(device=self.device)  # data.shape -> [batch, 1, Channels, Time]
+
+        self.a_graph = a_graph
+        self.c_graph = c_graph
+
+        self.class_bars = []
+        self.attribute_bars = []
+
+        # Setup Attribute graph
+        self.a_graph.clear()
+        self.a_graph.getAxis('left').setLabel(text='Attributes', units='')
+        self.a_graph.setYRange(0, 1, padding=0.1)
+        with open("../attrib.txt", "r") as f:
+            attributes = f.read().split(",")
+            for i, attribute in enumerate(attributes):
+                bar = pg.BarGraphItem(x0=[i], x1=i + 1, y0=0, y1=0, name=attribute)
+                self.attribute_bars.append(bar)
+                self.a_graph.addItem(bar)
+
+                label = pg.TextItem(text=attribute, color='b', anchor=(0, 0), border=None, fill=None, angle=-90,
+                                    rotateAxis=None)
+                label.setPos(i + 1, 1)
+
+                self.a_graph.addItem(label)
+            self.a_graph.setXRange(0, len(attributes), padding=0.02)
+
+        # Setup Class graph
+        self.c_graph.clear()
+        self.c_graph.getAxis('left').setLabel(text='Classes', units='')
+        self.c_graph.getAxis('bottom').setLabel(text='Time', units='s')
+        windows_per_recording = settings["recording_interval"] // settings['analysis_interval']
+        ticks = [(0, "now")]
+        ticks.extend([(-i, f"{-i}") for i in range(20, windows_per_recording + 1, 20)])
+        self.c_graph.getAxis('bottom').setTicks([ticks])
+        self.classes = np.zeros(windows_per_recording)
+        self.c_graph.setXRange(-windows_per_recording - 5, 5, padding=0.02)
+        with open("../class.txt", "r") as f:
+            self.class_names = f.read().split(",")
+            self.c_graph.setYRange(0, len(self.class_names) + 1, padding=0)
+
+            self.current_class_label = pg.TextItem(text="Current Class:", color='b', anchor=(1, 4), border=None,
+                                                   fill=None, angle=0, rotateAxis=None)
+            self.c_graph.addItem(self.current_class_label)
+
+            for i in range(windows_per_recording):
+                bar = pg.BarGraphItem(x0=[i - windows_per_recording], x1=i + 1 - windows_per_recording, y0=0, y1=0,
+                                      name=i)
+                self.class_bars.append(bar)
+                self.c_graph.addItem(bar)
 
     def start_timer(self):
         self.timer = self.startTimer(self.interval)
@@ -612,4 +732,42 @@ class AnalysysThread(QThread):
         self.analyse_data()
 
     def analyse_data(self):
-        pass
+        # get data from settings.py
+        self.data[0, 0, 0:6, :] = torch.from_numpy(la_data.T)
+        self.data[0, 0, 6:12, :] = torch.from_numpy(ll_data.T)
+        self.data[0, 0, 12:18, :] = torch.from_numpy(t_data.T)
+        self.data[0, 0, 18:24, :] = torch.from_numpy(ra_data.T)
+        self.data[0, 0, 24:30, :] = torch.from_numpy(rl_data.T)
+
+        self.data = network.norm_mbientlab(self.data).to(device=self.device)
+
+        # pass data through network
+        result = self.network(self.data).detach().cpu().numpy()
+        # calculate attributes and classes
+        cls, attr = self.predict_class_and_attributes(result)
+        # print(result.shape, cls.shape, attr.shape)
+        # print(result, cls, "\n", attr)
+
+        # update attribute graph
+        for i in range(len(self.attribute_bars)):
+            self.attribute_bars[i].setOpts(y1=attr[i])
+
+        # update class graph
+        self.current_class_label.setText(f"Current Class: {self.class_names[cls]}")
+        self.classes[:-1] = self.classes[1:]
+        self.classes[-1] = cls
+        for i in range(len(self.class_bars)):
+            self.class_bars[i].setOpts(y1=self.classes[i])
+
+    def predict_class_and_attributes(self, result):
+        attributes = np.array(self.attribute_representation[:, 1:])
+        classes = np.array(self.attribute_representation[:, 0])
+
+        distances = 1 - cosine_similarity(result, attributes)
+
+        sorted_distances = np.argsort(distances, 1)
+
+        sorted_attributes = attributes[sorted_distances[0]]
+        sorted_classes = classes[sorted_distances[0]]
+
+        return int(sorted_classes[0].item()), sorted_attributes[0]

@@ -1,0 +1,1 @@
+Gait,Step,Standing,Upwards,Centred,Downwards,NoIntentionalMotion,TorsoRotation,Right,Left,NoArms,BulkyUnit,HandyUnit,UtilityAux,Cart,Computer,NoItem,None,Error

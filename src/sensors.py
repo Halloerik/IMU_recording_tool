@@ -1,9 +1,9 @@
-'''
+"""
 Created on 18.2.2020
 
-@author: Erik Altermann
-@email: Erik.Altermann@tu-dortmund.de
-'''
+@author: Erik Altermann, Fernando Moya Rueda, Arthur Matei
+@email: erik.altermann@tu-dortmund.de, 	fernando.moya@tu-dortmund.de, arthur.matei@tu-dortmund.de
+"""
 
 from __future__ import print_function
 
@@ -18,9 +18,7 @@ from threading import Event
 import datetime
 import csv
 from PyQt5 import QtCore
-from settings import settings, state, \
-    t_data, la_data, ra_data, ll_data, rl_data, \
-    t_energy, la_energy, ra_energy, ll_energy, rl_energy
+from settings import settings, state, t_data, la_data, ra_data, ll_data, rl_data
 import os
 import numpy as np
 
@@ -51,7 +49,8 @@ class SensorState:
         """Saves the newest recieved"""
 
         values = parse_value(data, n_elem=2)
-        # print("%s -> acc: (%.4f,%.4f,%.4f), gyro; (%.4f,%.4f,%.4f)" % (self.device.address, values[0].x, values[0].y, values[0].z, values[1].x, values[1].y, values[1].z))
+        # print("%s -> acc: (%.4f,%.4f,%.4f), gyro; (%.4f,%.4f,%.4f)" % (
+        #       self.device.address, values[0].x, values[0].y, values[0].z, values[1].x, values[1].y, values[1].z))
         self.samples += 1
         self.writer.writerow((self.name, datetime.datetime.now(), str(values[0].x), str(values[0].y), str(values[0].z),
                               str(values[1].x), str(values[1].y), str(values[1].z)))
@@ -60,28 +59,18 @@ class SensorState:
         if self.name == 't':
             t_data[:-1] = t_data[1:]
             t_data[-1] = arr
-            t_energy[:-1] = t_energy[1:]
-            t_energy[-1] = np.linalg.norm(arr)
         elif self.name == 'la':
             la_data[:-1] = la_data[1:]
             la_data[-1] = arr
-            la_energy[:-1] = la_energy[1:]
-            la_energy[-1] = np.linalg.norm(arr)
         elif self.name == 'ra':
             ra_data[:-1] = ra_data[1:]
             ra_data[-1] = arr
-            ra_energy[:-1] = ra_energy[1:]
-            ra_energy[-1] = np.linalg.norm(arr)
         elif self.name == 'll':
             ll_data[:-1] = ll_data[1:]
             ll_data[-1] = arr
-            ll_energy[:-1] = ll_energy[1:]
-            ll_energy[-1] = np.linalg.norm(arr)
         elif self.name == 'rl':
             rl_data[:-1] = rl_data[1:]
             rl_data[-1] = arr
-            rl_energy[:-1] = rl_energy[1:]
-            rl_energy[-1] = np.linalg.norm(arr)
         else:
             raise ValueError
 
@@ -278,7 +267,7 @@ class SensorThread(QtCore.QThread):
         super(SensorThread, self).__init__()
         self.name = name
 
-        # Mac address of the the needed sensor
+        # Mac address of the needed sensor
         self.address = settings[name + '_address']
         self.disconnect = False
         self.recording = False
@@ -359,7 +348,7 @@ class SensorThread(QtCore.QThread):
 
 
 class SensorResetThread(QtCore.QThread):
-    """Handles the Sensor state"""
+    """Resets the sensor"""
 
     reset_attempt = QtCore.pyqtSignal(int)
     reset_success = QtCore.pyqtSignal(str)
@@ -395,12 +384,13 @@ class SensorResetThread(QtCore.QThread):
                 device.disconnect()
                 sleep(2)
                 self.reset_success.emit(self.name)
-                self.quit()
+                break
             except mbientlab.warble.WarbleException as e:
                 if i + 1 == settings['connection_retries']:
                     self.reset_failed.emit(self.name)
                     traceback.print_exc()
-                    self.quit()
+                    break
         self.quit()
+
     def check_battery(self):
         return "---"
