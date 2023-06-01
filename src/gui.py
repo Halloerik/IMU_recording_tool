@@ -30,7 +30,7 @@ from settings import settings, state, networks, network_path, network_window_siz
     t_energy, la_energy, ra_energy, ll_energy, rl_energy, \
     t_data, la_data, ra_data, ll_data, rl_data
 
-use_fake_sensors = True  # Useful for debugging without connecting sensors
+use_fake_sensors = False  # Useful for debugging without connecting sensors
 if use_fake_sensors:
     from fake_sensors import SensorThread, SensorResetThread
 else:
@@ -693,8 +693,8 @@ class AnalysisThread(QThread):
         self.a_graph = a_graph
         self.c_graph = c_graph
 
-        self.class_bars = []
-        self.attribute_bars = None
+        self.class_bars: pg.BarGraphItem = None
+        self.attribute_bars: pg.BarGraphItem = None
 
         # Setup Attribute graph
         self.a_graph.clear()
@@ -707,9 +707,9 @@ class AnalysisThread(QThread):
             self.a_graph.addItem(self.attribute_bars)
 
             for i, attribute in enumerate(attributes):
-                #bar = pg.BarGraphItem(x0=[i], x1=i + 1, y0=0, y1=0, name=attribute)
-                #self.attribute_bars.append(bar)
-                #self.a_graph.addItem(bar)
+                # bar = pg.BarGraphItem(x0=[i], x1=i + 1, y0=0, y1=0, name=attribute)
+                # self.attribute_bars.append(bar)
+                # self.a_graph.addItem(bar)
 
                 label = pg.TextItem(text=attribute, color='b', anchor=(0, 0), border=None, fill=None, angle=-90,
                                     rotateAxis=None)
@@ -736,11 +736,15 @@ class AnalysisThread(QThread):
                                                    fill=None, angle=0, rotateAxis=None)
             self.c_graph.addItem(self.current_class_label)
 
-            for i in range(windows_per_recording):
-                bar = pg.BarGraphItem(x0=[i - windows_per_recording], x1=i + 1 - windows_per_recording, y0=0, y1=0,
-                                      name=i)
-                self.class_bars.append(bar)  # TODO try to make the bargraphs using just 1 bargraph item
-                self.c_graph.addItem(bar)
+            self.class_bars = pg.BarGraphItem(x0=range(0, -windows_per_recording,-1)[::-1], width=-1,
+                                              height=[0 for _ in range(windows_per_recording)])
+            self.c_graph.addItem(self.class_bars)
+
+            #for i in range(windows_per_recording):
+            #    bar = pg.BarGraphItem(x0=[i - windows_per_recording], x1=i + 1 - windows_per_recording, y0=0, y1=0,
+            #                          name=i)
+            #    self.class_bars.append(bar)
+            #    self.c_graph.addItem(bar)
 
     def start_timer(self):
         self.timer = self.startTimer(self.interval)
@@ -780,18 +784,17 @@ class AnalysisThread(QThread):
         # print(result, cls, "\n", attr)
 
         # update attribute graph
-        #for i in range(len(self.attribute_bars)):
+        # for i in range(len(self.attribute_bars)):
         #    self.attribute_bars[i].setOpts(y1=attr[i])
-        print(result)
         self.attribute_bars.setOpts(height=attr)
-
 
         # update class graph
         self.current_class_label.setText(f"Current Class: {self.class_names[cls]}")
         self.classes[:-1] = self.classes[1:]
         self.classes[-1] = cls
-        for i in range(len(self.class_bars)):
-            self.class_bars[i].setOpts(y1=self.classes[i])
+        #for i in range(len(self.class_bars)):
+        #    self.class_bars[i].setOpts(y1=self.classes[i])
+        self.class_bars.setOpts(height=self.classes)
 
     def predict_class_and_attributes(self, result):
         attributes = np.array(self.attribute_representation[:, 1:])
@@ -809,10 +812,12 @@ class AnalysisThread(QThread):
     def reset_predictions(self):
         """Removes predictions from previous recording to start with a clean slate"""
         self.classes[:] = 0
-        for i in range(len(self.class_bars)):
-            self.class_bars[i].setOpts(y1=0)
-        #for i in range(len(self.attribute_bars)):
+        #for i in range(len(self.class_bars)):
+        #    self.class_bars[i].setOpts(y1=0)
+        self.class_bars.setOpts(height=[0 for _ in self.classes])
+        # for i in range(len(self.attribute_bars)):
         #    self.attribute_bars[i].setOpts(y1=0)
+        self.attribute_bars.setOpts(height=[0 for _ in self.attribute_bars.opts["height"]])
 
     def save_predictions(self):
         """Saves predictions in the same folder as the data is stored"""

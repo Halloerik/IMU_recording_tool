@@ -62,7 +62,7 @@ network_window_size = {"old100": 100,
                        "mocap_half": 100,
                        "motionminers_flw100": 100}
 
-# Only networks with this window_size
+# Only networks with this window_size will be shown
 window_size = 100
 
 # Raw data from each sensor.
