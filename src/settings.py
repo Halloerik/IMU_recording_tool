@@ -5,7 +5,7 @@ Created on 11.06.2020
 @email: erik.altermann@tu-dortmund.de, 	fernando.moya@tu-dortmund.de, arthur.matei@tu-dortmund.de
 '''
 import math
-
+import os
 import numpy as np
 # from mbientlab.metawear.cbindings import GyroBoschOdr,GyroBoschRange
 from mbientlab.metawear.metawear import GyroBoschOdr, GyroBoschRange, AccBmi160Odr, AccBoschRange
@@ -16,8 +16,8 @@ settings = {
     'ra_address': 'EE:2D:7D:2E:3A:72',
     'll_address': 'C8:73:59:6B:FB:D1',
     'rl_address': 'FF:EA:47:38:42:8E',
-    'folder': 'recordings',
-    'recording_interval': 140*1000,  # 140 seconds
+    'folder': f'..{os.sep}recordings',
+    'recording_interval': 140 * 1000,  # 140 seconds
 
     # Sensor parameters see:
     # https://mbientlab.com/documents/metawear/cpp/latest/accelerometer_8h.html
@@ -35,7 +35,7 @@ settings = {
     'latency': 0,
     'timeout': 6000,
 
-    'connection_retries':10,  # How often the program will try to connect to the sensors before giving up.
+    'connection_retries': 10,  # How often the program will try to connect to the sensors before giving up.
 
     # Other timers
     'graph_interval': 10,  # Milliseconds
@@ -52,21 +52,29 @@ state = {'recording': False,
          'll_connected': False,
          'rl_connected': False, }
 
+networks = ["old100", "mbientlab100", "mocap_half"]  # , "motionminers_flw100"]
+network_path = {"old100": f'..{os.sep}network.pt',
+                "mbientlab100": f'..{os.sep}mbientlab100{os.sep}network.pt',
+                "mocap_half": f'..{os.sep}mocap_half{os.sep}network.pt',
+                "motionminers_flw100": f'..{os.sep}motionminers_flw100{os.sep}network.pt'}
+network_window_size = {"old100": 100,
+                       "mbientlab100": 100,
+                       "mocap_half": 100,
+                       "motionminers_flw100": 100}
 
-# if not os.path.exists(settings["folder"]):
-#    os.makedirs(settings["folder"])
+# Only networks with this window_size
+window_size = 100
 
 # Raw data from each sensor.
-t_data =  np.zeros((200, 6))
-la_data = np.zeros((200, 6))
-ra_data = np.zeros((200, 6))
-ll_data = np.zeros((200, 6))
-rl_data = np.zeros((200, 6))
+t_data = np.zeros((window_size, 6))
+la_data = np.zeros((window_size, 6))
+ra_data = np.zeros((window_size, 6))
+ll_data = np.zeros((window_size, 6))
+rl_data = np.zeros((window_size, 6))
 
 # L2 Norm of each sensors raw data.
-t_energy =  np.zeros((200,))
-la_energy = np.zeros((200,))
-ra_energy = np.zeros((200,))
-ll_energy = np.zeros((200,))
-rl_energy = np.zeros((200,))
-
+t_energy = np.zeros((window_size,))
+la_energy = np.zeros((window_size,))
+ra_energy = np.zeros((window_size,))
+ll_energy = np.zeros((window_size,))
+rl_energy = np.zeros((window_size,))

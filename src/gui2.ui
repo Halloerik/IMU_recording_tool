@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>807</width>
+    <width>826</width>
     <height>554</height>
    </rect>
   </property>
@@ -459,23 +459,12 @@
        <item row="2" column="0" colspan="2">
         <layout class="QHBoxLayout" name="horizontalLayout_2">
          <item>
+          <widget class="QComboBox" name="select_network_comboBox"/>
+         </item>
+         <item>
           <widget class="QPushButton" name="pushButton_load_nn">
            <property name="text">
             <string>Load Network</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_18">
-           <property name="text">
-            <string>Loaded network:</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_nn">
-           <property name="text">
-            <string>None</string>
            </property>
           </widget>
          </item>
@@ -491,6 +480,20 @@
             </size>
            </property>
           </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_18">
+           <property name="text">
+            <string>Loaded network:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_nn">
+           <property name="text">
+            <string>None</string>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>

@@ -26,7 +26,7 @@ from mbientlab.metawear import MetaWear, libmetawear
 import mbientlab.warble
 
 import network
-from settings import settings, state, \
+from settings import settings, state, networks, network_path, network_window_size, window_size, \
     t_energy, la_energy, ra_energy, ll_energy, rl_energy, \
     t_data, la_data, ra_data, ll_data, rl_data
 
@@ -76,7 +76,7 @@ class GUI(QtWidgets.QMainWindow):
 
         # This timer will use a neural network to analyse the recorded data live.
         # It is initialized in the self.load_network() method
-        self.analysis_timer = None
+        self.analysis_timer: AnalysisThread = None
 
     def init_gui_elements(self):
         """Connects GUI-Elements to their functions"""
@@ -129,23 +129,23 @@ class GUI(QtWidgets.QMainWindow):
         # ----------Recording graphs---------------------------
         # -----------------------------------------------------
         t_graph = self.findChild(pg.PlotWidget, "graphicsView_t")
-        t_graph.setYRange(0, 500)
+        # t_graph.setYRange(0, 500)
         self.t_plot = t_graph.plot(t_energy)
 
         la_graph = self.findChild(pg.PlotWidget, "graphicsView_la")
-        la_graph.setYRange(0, 500)
+        # la_graph.setYRange(0, 500)
         self.la_plot = la_graph.plot(la_energy)
 
         ra_graph = self.findChild(pg.PlotWidget, "graphicsView_ra")
-        ra_graph.setYRange(0, 500)
+        # ra_graph.setYRange(0, 500)
         self.ra_plot = ra_graph.plot(ra_energy)
 
         ll_graph = self.findChild(pg.PlotWidget, "graphicsView_ll")
-        ll_graph.setYRange(0, 500)
+        # ll_graph.setYRange(0, 500)
         self.ll_plot = ll_graph.plot(ll_energy)
 
         rl_graph = self.findChild(pg.PlotWidget, "graphicsView_rl")
-        rl_graph.setYRange(0, 500)
+        # rl_graph.setYRange(0, 500)
         self.rl_plot = rl_graph.plot(rl_energy)
 
         # -----------------------------------------------------
@@ -153,6 +153,11 @@ class GUI(QtWidgets.QMainWindow):
         # -----------------------------------------------------
         self.c_graph = self.findChild(pg.PlotWidget, "graphicsView_c")
         self.a_graph = self.findChild(pg.PlotWidget, "graphicsView_a")
+
+        self.network_seletion_comboBox = self.findChild(QtWidgets.QComboBox, "select_network_comboBox")
+        for net in networks:
+            if network_window_size[net] == window_size:
+                self.network_seletion_comboBox.addItem(net)
 
         self.nn_button = self.findChild(QtWidgets.QPushButton, "pushButton_load_nn")
         self.nn_button.clicked.connect(lambda _: self.load_network())
@@ -390,8 +395,11 @@ class GUI(QtWidgets.QMainWindow):
 
     def load_network(self):
         """Loads the neural network used for live analysis and initializes the analysis thread"""
-        net = network.load_network("../network.pt")
-        self.nn_label.setText("Loaded")
+
+        network_name = self.network_seletion_comboBox.currentText()
+        net = network.load_network(network_path[network_name])
+        self.nn_label.setText(f"Loaded {network_name}")
+        print(f"{network_name} from {network_path[network_name]}")
 
         attribute_rep = np.loadtxt(f"..{os.sep}atts_per_class_dataset.txt", delimiter=",")
 
@@ -431,6 +439,22 @@ class GUI(QtWidgets.QMainWindow):
                 os.makedirs(path)
             state['final_folder'] = path
             sleep(1)
+
+            # Reset all graphs
+            t_data[:] = 0
+            la_data[:] = 0
+            ra_data[:] = 0
+            ll_data[:] = 0
+            rl_data[:] = 0
+
+            t_energy[:] = 0
+            la_energy[:] = 0
+            ra_energy[:] = 0
+            ll_energy[:] = 0
+            rl_energy[:] = 0
+
+            if self.analysis_timer:
+                self.analysis_timer.reset_predictions()
 
             # Disable all Disconnect Buttons so that sensors can't change during Recording
             self.t_connection_button.setEnabled(False)
@@ -473,6 +497,7 @@ class GUI(QtWidgets.QMainWindow):
         self.graph_timer.stop_timer()
         if self.analysis_timer:
             self.analysis_timer.stop_timer()
+            self.analysis_timer.save_predictions()
 
         # Enables all connection buttons again
         self.t_connection_button.setEnabled(True)
@@ -662,7 +687,7 @@ class AnalysisThread(QThread):
 
         use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if use_cuda else "cpu")
-        self.data = torch.randn((1, 1, 30, 200)).to(device=self.device)  # data.shape -> [batch, 1, Channels, Time]
+        self.data = torch.randn((1, 1, 30, window_size)).to(device=self.device)  # data.shape -> [batch, 1, Channels, Time]
 
         self.a_graph = a_graph
         self.c_graph = c_graph
@@ -709,11 +734,12 @@ class AnalysisThread(QThread):
             for i in range(windows_per_recording):
                 bar = pg.BarGraphItem(x0=[i - windows_per_recording], x1=i + 1 - windows_per_recording, y0=0, y1=0,
                                       name=i)
-                self.class_bars.append(bar)
+                self.class_bars.append(bar)  # TODO try to make the bargraphs using just 1 bargraph item
                 self.c_graph.addItem(bar)
 
     def start_timer(self):
         self.timer = self.startTimer(self.interval)
+
         # print("timer started, id:",self.timer)
 
     def stop_timer(self):
@@ -771,3 +797,17 @@ class AnalysisThread(QThread):
         sorted_classes = classes[sorted_distances[0]]
 
         return int(sorted_classes[0].item()), sorted_attributes[0]
+
+    def reset_predictions(self):
+        """Removes predictions from previous recording to start with a clean slate"""
+        self.classes[:] = 0
+        for i in range(len(self.class_bars)):
+            self.class_bars[i].setOpts(y1=0)
+        for i in range(len(self.attribute_bars)):
+            self.attribute_bars[i].setOpts(y1=0)
+
+    def save_predictions(self):
+        """Saves predictions in the same folder as the data is stored"""
+
+        with open(f"{state['final_folder']}{os.sep}predictions.csv", "wt") as file:
+            file.writelines([f"{i}\n" for i in self.classes[::-1]])

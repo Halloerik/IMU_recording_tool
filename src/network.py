@@ -17,6 +17,7 @@ import numpy as np
 from tpp import TPP
 import math
 import pickle
+from settings import window_size
 
 config = {'dataset': 'mbientlab100', 'network': 'cnn_imu_tpp',
           'output': 'attribute', 'num_filters': 64, 'filter_size': 5,
@@ -1250,12 +1251,10 @@ std_values = np.reshape(std_values, [1, 30])
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
-window_size = 200
-
 mean_values = torch.from_numpy(np.repeat(mean_values, window_size, axis=0).T[None, None, :, :]).to(device=device,
-                                                                                           dtype=torch.float)
+                                                                                                   dtype=torch.float)
 std_values = torch.from_numpy(np.repeat(std_values, window_size, axis=0).T[None, None, :, :]).to(device=device,
-                                                                                         dtype=torch.float)
+                                                                                                 dtype=torch.float)
 
 max_values = mean_values + 2 * std_values
 min_values = mean_values - 2 * std_values
