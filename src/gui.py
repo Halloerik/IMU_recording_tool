@@ -30,7 +30,7 @@ from settings import settings, state, networks, network_path, network_window_siz
     t_energy, la_energy, ra_energy, ll_energy, rl_energy, \
     t_data, la_data, ra_data, ll_data, rl_data
 
-use_fake_sensors = False  # Useful for debugging without connecting sensors
+use_fake_sensors = True  # Useful for debugging without connecting sensors
 if use_fake_sensors:
     from fake_sensors import SensorThread, SensorResetThread
 else:
@@ -687,13 +687,14 @@ class AnalysisThread(QThread):
 
         use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if use_cuda else "cpu")
-        self.data = torch.randn((1, 1, 30, window_size)).to(device=self.device)  # data.shape -> [batch, 1, Channels, Time]
+        self.data = torch.randn((1, 1, 30, window_size)).to(
+            device=self.device)  # data.shape -> [batch, 1, Channels, Time]
 
         self.a_graph = a_graph
         self.c_graph = c_graph
 
         self.class_bars = []
-        self.attribute_bars = []
+        self.attribute_bars = None
 
         # Setup Attribute graph
         self.a_graph.clear()
@@ -701,10 +702,14 @@ class AnalysisThread(QThread):
         self.a_graph.setYRange(0, 1, padding=0.1)
         with open("../attrib.txt", "r") as f:
             attributes = f.read().split(",")
+            num_attr = len(attributes)
+            self.attribute_bars = pg.BarGraphItem(x0=range(num_attr), width=1, height=[0 for _ in range(num_attr)])
+            self.a_graph.addItem(self.attribute_bars)
+
             for i, attribute in enumerate(attributes):
-                bar = pg.BarGraphItem(x0=[i], x1=i + 1, y0=0, y1=0, name=attribute)
-                self.attribute_bars.append(bar)
-                self.a_graph.addItem(bar)
+                #bar = pg.BarGraphItem(x0=[i], x1=i + 1, y0=0, y1=0, name=attribute)
+                #self.attribute_bars.append(bar)
+                #self.a_graph.addItem(bar)
 
                 label = pg.TextItem(text=attribute, color='b', anchor=(0, 0), border=None, fill=None, angle=-90,
                                     rotateAxis=None)
@@ -775,8 +780,11 @@ class AnalysisThread(QThread):
         # print(result, cls, "\n", attr)
 
         # update attribute graph
-        for i in range(len(self.attribute_bars)):
-            self.attribute_bars[i].setOpts(y1=attr[i])
+        #for i in range(len(self.attribute_bars)):
+        #    self.attribute_bars[i].setOpts(y1=attr[i])
+        print(result)
+        self.attribute_bars.setOpts(height=attr)
+
 
         # update class graph
         self.current_class_label.setText(f"Current Class: {self.class_names[cls]}")
@@ -803,8 +811,8 @@ class AnalysisThread(QThread):
         self.classes[:] = 0
         for i in range(len(self.class_bars)):
             self.class_bars[i].setOpts(y1=0)
-        for i in range(len(self.attribute_bars)):
-            self.attribute_bars[i].setOpts(y1=0)
+        #for i in range(len(self.attribute_bars)):
+        #    self.attribute_bars[i].setOpts(y1=0)
 
     def save_predictions(self):
         """Saves predictions in the same folder as the data is stored"""
