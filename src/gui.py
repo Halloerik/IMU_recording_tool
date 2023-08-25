@@ -4,7 +4,7 @@ Created on 18.2.2020
 @author: Erik Altermann, Fernando Moya Rueda, Arthur Matei
 @email: erik.altermann@tu-dortmund.de, 	fernando.moya@tu-dortmund.de, arthur.matei@tu-dortmund.de
 """
-
+import csv
 import traceback
 from builtins import map
 from _functools import reduce
@@ -736,17 +736,20 @@ class AnalysisThread(QThread):
                                                    fill=None, angle=0, rotateAxis=None)
             self.c_graph.addItem(self.current_class_label)
 
-            self.class_bars = pg.BarGraphItem(x0=range(0, -windows_per_recording,-1)[::-1], width=-1,
+            self.class_bars = pg.BarGraphItem(x0=range(0, -windows_per_recording, -1)[::-1], width=-1,
                                               height=[0 for _ in range(windows_per_recording)])
             self.c_graph.addItem(self.class_bars)
 
-            #for i in range(windows_per_recording):
+            # for i in range(windows_per_recording):
             #    bar = pg.BarGraphItem(x0=[i - windows_per_recording], x1=i + 1 - windows_per_recording, y0=0, y1=0,
             #                          name=i)
             #    self.class_bars.append(bar)
             #    self.c_graph.addItem(bar)
 
+
+
     def start_timer(self):
+        self.create_file()
         self.timer = self.startTimer(self.interval)
 
         # print("timer started, id:",self.timer)
@@ -754,6 +757,7 @@ class AnalysisThread(QThread):
     def stop_timer(self):
         self.killTimer(self.timer)
         self.timer = 0
+        self.close_file()
         # print("timer stopped")
 
     def set_interval(self, interval):
@@ -777,7 +781,10 @@ class AnalysisThread(QThread):
         self.data = network.norm_mbientlab(self.data).to(device=self.device)
 
         # pass data through network
-        result = self.network(self.data).detach().cpu().numpy()
+        result:np.ndarray = self.network(self.data).detach().cpu().numpy()
+
+        self.writer.writerow(result.tolist().tuple())
+
         # calculate attributes and classes
         cls, attr = self.predict_class_and_attributes(result)
         # print(result.shape, cls.shape, attr.shape)
@@ -786,22 +793,22 @@ class AnalysisThread(QThread):
         # update attribute graph
         # for i in range(len(self.attribute_bars)):
         #    self.attribute_bars[i].setOpts(y1=attr[i])
-        self.attribute_bars.setOpts(height=attr)
+        #self.attribute_bars.setOpts(height=attr)
+        self.attribute_bars.setOpts(height=np.around(result[0]))
 
         # update class graph
         self.current_class_label.setText(f"Current Class: {self.class_names[cls]}")
         self.classes[:-1] = self.classes[1:]
-        self.classes[-1] = cls
-        #for i in range(len(self.class_bars)):
+        self.classes[-1] = cls + 1
+        # for i in range(len(self.class_bars)):
         #    self.class_bars[i].setOpts(y1=self.classes[i])
         self.class_bars.setOpts(height=self.classes)
 
-    def predict_class_and_attributes(self, result):
-        attributes = np.array(self.attribute_representation[:, 1:])
-        classes = np.array(self.attribute_representation[:, 0])
+    def predict_class_and_attributes(self, result:np.ndarray): #19
+        attributes = np.array(self.attribute_representation[:, 1:]) #302,19
+        classes = np.array(self.attribute_representation[:, 0])# 302
 
         distances = 1 - cosine_similarity(result, attributes)
-
         sorted_distances = np.argsort(distances, 1)
 
         sorted_attributes = attributes[sorted_distances[0]]
@@ -809,10 +816,36 @@ class AnalysisThread(QThread):
 
         return int(sorted_classes[0].item()), sorted_attributes[0]
 
+
+        """dist_funct = torch.nn.BCELoss(reduce=False, reduction="sum")
+        attrs_repeat = np.reshape(attributes, newshape=[1, attributes.shape[0], attributes.shape[1]])  # [1, 302,19]
+        attrs_repeat = np.repeat(attrs_repeat, result.shape[0], axis=0)  # [batches, 302,19] = #[200, 302,19]
+        attrs_repeat = torch.from_numpy(attrs_repeat[:, :, :])
+        attrs_repeat = attrs_repeat.to(self.device, dtype=torch.float)
+
+        predictions = np.ones((attributes.shape[0], 1, 19)) * result[None, :]  ##[200, 19] = #[302, 200,19]
+        predictions = torch.from_numpy(predictions.transpose(1, 0, 2)).to(self.device, dtype=torch.float)  ##[200, 302,19]
+
+        # compute the distance among the predictions of the network
+        # and the the attribute representation
+        distances = dist_funct(predictions, attrs_repeat)  # predictions [200, 302,19] vs #attr rep[200, 302,19]
+        # distances [200, 302, 19]
+        #### one - distances /100
+        distances = distances.sum(axis=2)  # [200, 302]
+
+
+        sorted_distances = np.argsort(distances.cpu().numpy(), 1)
+        sorted_attributes = attributes[sorted_distances[0]]
+        sorted_classes = classes[sorted_distances[0]]
+
+        return int(sorted_classes[0].item()), sorted_attributes[0]"""
+
+
+
     def reset_predictions(self):
         """Removes predictions from previous recording to start with a clean slate"""
         self.classes[:] = 0
-        #for i in range(len(self.class_bars)):
+        # for i in range(len(self.class_bars)):
         #    self.class_bars[i].setOpts(y1=0)
         self.class_bars.setOpts(height=[0 for _ in self.classes])
         # for i in range(len(self.attribute_bars)):
@@ -823,4 +856,18 @@ class AnalysisThread(QThread):
         """Saves predictions in the same folder as the data is stored"""
 
         with open(f"{state['final_folder']}{os.sep}predictions.csv", "wt") as file:
-            file.writelines([f"{i}\n" for i in self.classes[::-1]])
+            file.writelines(
+                [f"{i}\n" for i in self.classes[::-1] - 1])  # Subtract 1 because it was added for visualisation
+
+
+    def create_file(self):
+        """Creates a new csv file to save all sensor data"""
+
+        # Creating file
+        filepath = f"{state['final_folder']}{os.sep}network.csv"
+        file = open(filepath, 'wt', newline='')
+        self.writer = csv.writer(file, delimiter=',')
+        self.file = file
+
+    def close_file(self):
+        self.file.close()

@@ -23,7 +23,7 @@ config = {'dataset': 'mbientlab100', 'network': 'cnn_imu_tpp',
           'output': 'attribute', 'num_filters': 64, 'filter_size': 5,
           'folder_exp': '',
           'NB_sensor_channels': 30,
-          'sliding_window_length': 100, 'num_attributes': 19, 'num_classes': 7,
+          'sliding_window_length': 200, 'num_attributes': 19, 'num_classes': 7,
           'reshape_input': False,
           'aggregate': 'FC', 'pooling': 0,
           'storing_acts': False}
@@ -1218,18 +1218,33 @@ def load_network(path) -> Network:
     """"""
     state_dict = torch.load(path)
     # print(state_dict.keys())
-    # print(state_dict["network_config"])
+    net_config = state_dict["network_config"]
+
+    if "dataset" not in net_config.keys():
+        net_config["dataset"] = f"mbientlab{window_size}"
+    if "pooling" not in net_config.keys():
+        net_config["pooling"] = 0
+    if "aggregate" not in net_config.keys():
+        net_config['aggregate']= 'FC'
+    if "storing_acts" not in net_config.keys():
+        net_config["storing_acts"] = False
 
     # net = Network(state_dict["network_config"]) # incomplete config. gives keyerrors
-    net = Network(config)
+    #net = Network(config)
+    net = Network(net_config)
+
+    print(net.config['sliding_window_length'])
     net.load_state_dict(state_dict["state_dict"])
     net.eval()
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     net.to(device=device, dtype=torch.float)
+
     # print(net)
     return net
+
+
 
 
 mean_values = np.array([-0.59011078, 0.21370987, 0.35121016, 0.92213551, 0.16381447,
@@ -1239,7 +1254,6 @@ mean_values = np.array([-0.59011078, 0.21370987, 0.35121016, 0.92213551, 0.16381
                         0.41563179, -1.09679218, 0.70833077, 0.37622293, -0.2071909,
                         -0.87027332, -0.20594663, -0.13839382, 0.1675007, 0.70815734])
 mean_values = np.reshape(mean_values, [1, 30])
-
 std_values = np.array([1.02790431, 0.54293909, 0.60919268, 56.30538052, 72.91016666,
                        78.53805221, 0.89515912, 0.54585097, 0.62408347, 75.26524784,
                        91.73655101, 60.16483688, 0.33170985, 0.21570707, 0.29992192,
@@ -1262,10 +1276,8 @@ min_values = mean_values - 2 * std_values
 
 def norm_mbientlab(data):
     data_norm = (data - min_values) / (max_values - min_values)
-
     data_norm[data_norm > 1] = 1
     data_norm[data_norm < 0] = 0
-
     return data_norm
 
 

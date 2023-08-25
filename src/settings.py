@@ -21,12 +21,11 @@ settings = {
 
     # Sensor parameters see:
     # https://mbientlab.com/documents/metawear/cpp/latest/accelerometer_8h.html
-    # https://mbientlab.com/documents/metawear/cpp/latest/gyro__bmi160_8h.html
     # https://mbientlab.com/documents/metawear/cpp/latest/gyro__bosch_8h.html
-    'acc_odr': AccBmi160Odr._100Hz,
-    'acc_range': AccBoschRange._8G,
+    'acc_odr': 100.0,  # Hz
+    'acc_range': 16.0,  # G
     'gyro_odr': GyroBoschOdr._100Hz,
-    'gyro_range': GyroBoschRange._250dps,
+    'gyro_range': GyroBoschRange._1000dps,
 
     # Connection parameters see:
     # https://mbientlab.com/documents/metawear/cpp/latest/settings_8h.html#a1cf3cae052fe7981c26124340a41d66d
@@ -52,18 +51,25 @@ state = {'recording': False,
          'll_connected': False,
          'rl_connected': False, }
 
-networks = ["old100", "mbientlab100", "mocap_half"]  # , "motionminers_flw100"]
+networks = ["old100", "mbientlab100", "mocap_half", "mbientlab200", "mbientlab200_nonIMU", "motionminers_flw100"]
 network_path = {"old100": f'..{os.sep}network.pt',
                 "mbientlab100": f'..{os.sep}mbientlab100{os.sep}network.pt',
                 "mocap_half": f'..{os.sep}mocap_half{os.sep}network.pt',
-                "motionminers_flw100": f'..{os.sep}motionminers_flw100{os.sep}network.pt'}
+                "motionminers_flw100": f'..{os.sep}motionminers_flw100{os.sep}network.pt',
+                "mbientlab200_nonIMU": f'..{os.sep}mbientlab200_nonIMU{os.sep}network.pt',
+                "mbientlab200": f'..{os.sep}mbientlab200{os.sep}network.pt',
+                }
+
+
 network_window_size = {"old100": 100,
                        "mbientlab100": 100,
                        "mocap_half": 100,
-                       "motionminers_flw100": 100}
+                       "motionminers_flw100": 100,
+                       "mbientlab200_nonIMU": 200,
+                       "mbientlab200": 200,}
 
 # Only networks with this window_size will be shown
-window_size = 100
+window_size = 200
 
 # Raw data from each sensor.
 t_data = np.zeros((window_size, 6))

@@ -48,10 +48,11 @@ class SensorState:
     def data_handler(self, ctx, data):
         """Saves the newest recieved"""
 
-        values = parse_value(data, n_elem=2)
-        # print("%s -> acc: (%.4f,%.4f,%.4f), gyro; (%.4f,%.4f,%.4f)" % (
-        #       self.device.address, values[0].x, values[0].y, values[0].z, values[1].x, values[1].y, values[1].z))
         self.samples += 1
+        # print(data,data.contents,"\n", data["epoch"],data["extra"],data["value"])
+
+
+        values = parse_value(data, n_elem=2)
         self.writer.writerow((self.name, datetime.datetime.now(), str(values[0].x), str(values[0].y), str(values[0].z),
                               str(values[1].x), str(values[1].y), str(values[1].z)))
 
@@ -146,14 +147,13 @@ class SensorState:
         sleep(1.5)
 
         # Accelerometer setup
-        libmetawear.mbl_mw_acc_set_odr(self.device.board, settings['acc_odr'])
         libmetawear.mbl_mw_acc_set_range(self.device.board, settings['acc_range'])
+        libmetawear.mbl_mw_acc_set_odr(self.device.board, settings['acc_odr'])
         libmetawear.mbl_mw_acc_write_acceleration_config(self.device.board)
 
         # Gyroscope setup
-        libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board,
-                                               settings['gyro_odr'])  # because of the MblMwGyroBmi169Odr
         libmetawear.mbl_mw_gyro_bmi160_set_range(self.device.board, settings['gyro_range'])
+        libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board, settings['gyro_odr'])
         libmetawear.mbl_mw_gyro_bmi160_write_config(self.device.board)
 
         # Subscription is handled below with the data fusion
@@ -176,11 +176,23 @@ class SensorState:
         fn_wrapper = FnVoid_VoidP_VoidP(processor_created)
         acc = libmetawear.mbl_mw_acc_get_acceleration_data_signal(self.device.board)
         gyro = libmetawear.mbl_mw_gyro_bmi160_get_rotation_data_signal(self.device.board)
+
         signals = (c_void_p * 1)()
         signals[0] = gyro
         libmetawear.mbl_mw_dataprocessor_fuser_create(acc, signals, 1, None, fn_wrapper)
         e.wait()
         libmetawear.mbl_mw_datasignal_subscribe(self.processor, None, self.callback)
+
+        """libmetawear.mbl_mw_sensor_fusion_set_mode(self.device.board, SensorFusionMode.IMU_PLUS)
+        libmetawear.mbl_mw_sensor_fusion_set_acc_range(self.device.board, SensorFusionAccRange._8G)
+        libmetawear.mbl_mw_sensor_fusion_set_gyro_range(self.device.board, SensorFusionGyroRange._250DPS)
+        libmetawear.mbl_mw_sensor_fusion_write_config(self.device.board)
+
+        signal = libmetawear.mbl_mw_sensor_fusion_get_data_signal(self.device.board, SensorFusionData.QUATERNION)
+        libmetawear.mbl_mw_datasignal_subscribe(signal, None, self.callback)
+
+        libmetawear.mbl_mw_sensor_fusion_enable_data(self.device.board, SensorFusionData.QUATERNION)"""
+
         self.set_light_pattern('setup')
         print('  done')
 
@@ -193,6 +205,9 @@ class SensorState:
         libmetawear.mbl_mw_gyro_bmi160_enable_rotation_sampling(self.device.board)
         libmetawear.mbl_mw_acc_start(self.device.board)
         libmetawear.mbl_mw_gyro_bmi160_start(self.device.board)
+
+        # libmetawear.mbl_mw_sensor_fusion_start(self.device.board)
+
         self.set_light_pattern('recording')
 
     def stop_recording(self):
@@ -201,6 +216,8 @@ class SensorState:
         libmetawear.mbl_mw_gyro_bmi160_stop(self.device.board)
         libmetawear.mbl_mw_acc_disable_acceleration_sampling(self.device.board)
         libmetawear.mbl_mw_gyro_bmi160_disable_rotation_sampling(self.device.board)
+
+        # libmetawear.mbl_mw_sensor_fusion_stop(self.device.board)
         self.set_light_pattern('setup')
         self.close_file()
 
